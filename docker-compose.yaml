@@ -1,0 +1,15 @@
+services:
+  booking_db:
+    image: postgres:16.0-alpine
+    container_name: booking_db
+    environment:
+      - POSTGRES_USER=${PG_USERNAME}
+      - POSTGRES_PASSWORD=${PG_PASSWORD}
+      - POSTGRES_DB=${PG_DATABASE}
+    ports:
+      - "${PG_PORT}:5432"
+    volumes:
+      - pg-data:/var/lib/postgresql/data
+
+volumes:
+  pg-data:
