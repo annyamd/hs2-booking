@@ -10,6 +10,16 @@ services:
       - "${PG_PORT}:5432"
     volumes:
       - pg-data:/var/lib/postgresql/data
-
+  booking_liquid:
+    image: liquibase/liquibase
+    container_name: booking_liquid
+    environment:
+      LIQUIBASE_COMMAND_USERNAME: ${PG_USERNAME}
+      LIQUIBASE_COMMAND_PASSWORD: ${PG_PASSWORD}
+      LIQUIBASE_COMMAND_URL: jdbc:postgresql://booking_db:5432/${PG_DATABASE}
+    volumes:
+      - ./src/main/resources/db/changelog/:/liquibase/changelog
+      - ./src/main/resources/db/db.changelog-master.xml:/liquibase/db.changelog-master.xml
+    command: --changelog-file db.changelog-master.xml update
 volumes:
   pg-data:
