@@ -10,6 +10,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 
 import java.util.List;
 
@@ -25,34 +27,35 @@ public class BookingController {
     private final BookingService bookingService;
 
     @GetMapping(value = "/")
-    public ResponseEntity<?> getAllRecords(
+    public Mono<ResponseEntity<?>> getAllRecords(
             @RequestParam(value = "page", defaultValue = "0") @Min(value = 0, message = MSG_PAGE_NEGATIVE) int page,
             @RequestParam(value = "size", defaultValue = "5") @Min(value = 0, message = MSG_SIZE_NEGATIVE) @Max(value = 50, message = MSG_SIZE_TOO_BIG) int size
     ) {
-        List<BookingDTO> records = bookingService.findAll(page, size);
-        return ResponseEntity.ok(records);
+        return bookingService.findAll(page, size)
+                .collectList()
+                .map(ResponseEntity::ok);
     }
 
     @GetMapping(value = "/{bookingId}")
-    public ResponseEntity<?> getRecordById(
+    public Mono<ResponseEntity<?>> getRecordById(
             @PathVariable @Min(value = 0, message = MSG_ID_NEGATIVE) long bookingId
     ) {
-        BookingDTO booking = bookingService.findById(bookingId);
-        return ResponseEntity.ok(booking);
+        return bookingService.findById(bookingId)
+                .map(ResponseEntity::ok);
     }
 
     @PostMapping(value = "/")
-    public ResponseEntity<?> createBookingRecord(@Valid @RequestBody BookingDTO newRecord) {
-        BookingDTO created = bookingService.create(newRecord);
-        return ResponseEntity.status(HttpStatus.CREATED).body(created);
+    public Mono<ResponseEntity<?>> createBookingRecord(@Valid @RequestBody BookingDTO newRecord) {
+        return bookingService.create(newRecord)
+                .map(created -> ResponseEntity.status(HttpStatus.CREATED).body(created));
     }
 
     @DeleteMapping(value = "/{recordId}")
-    public ResponseEntity<?> deleteBookingRecord(
+    public Mono<ResponseEntity<?>> deleteBookingRecord(
             @PathVariable @Min(value = 0, message = MSG_ID_NEGATIVE) long recordId
     ) {
-        bookingService.delete(recordId);
-        return new ResponseEntity<>(HttpStatus.OK);
+        return bookingService.delete(recordId)
+                .then(Mono.just(new ResponseEntity<>(HttpStatus.OK)));
     }
 
 }

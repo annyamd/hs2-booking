@@ -1,18 +1,20 @@
 package com.example.hs2booking.repository;
 
 import com.example.hs2booking.model.entity.Booking;
-import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.repository.reactive.ReactiveCrudRepository;
 import org.springframework.stereotype.Repository;
-
-import java.util.List;
+import reactor.core.publisher.Flux;
 
 
 @Repository
-public interface BookingRepository extends JpaRepository<Booking, Long> {
+public interface BookingRepository extends ReactiveCrudRepository<Booking, Long> {
 
-    List<Booking> findByPlayerId(Long playerId);
+    Flux<Booking> findByPlayerId(Long playerId);
 
-    List<Booking> findByTeamId(Long teamId);
+    Flux<Booking> findByTeamId(Long teamId);
 
-    List<Booking> findByPlaygroundId(Long playgroundId);
+    Flux<Booking> findByPlaygroundId(Long playgroundId);
+
+    Flux<Booking> findAllBy(Pageable pageable);
 }
