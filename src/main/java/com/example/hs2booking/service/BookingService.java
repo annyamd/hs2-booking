@@ -11,6 +11,9 @@ import com.example.hs2booking.model.entity.Booking;
 import com.example.hs2booking.repository.BookingRepository;
 import com.example.hs2booking.service.feign.ActorsClient;
 import com.example.hs2booking.service.feign.PlaygroundClient;
+import com.example.hs2booking.service.feign.ActorsClientForPlayerWrapper;
+import com.example.hs2booking.service.feign.ActorsClientForTeamWrapper;
+import com.example.hs2booking.service.feign.PlaygroundClientWrapper;
 import com.example.hs2booking.util.Mapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
@@ -32,8 +35,9 @@ public class BookingService {
 
     private final Mapper<Booking, BookingDTO> mapper = new BookingMapper();
     private final BookingRepository bookingRepository;
-    private final PlaygroundClient playgroundClient;
-    private final ActorsClient actorsClient;
+    private final PlaygroundClientWrapper playgroundClientWrapper;
+    private final ActorsClientForTeamWrapper actorsClientForTeamWrapper;
+    private final ActorsClientForPlayerWrapper actorsClientForPlayerWrapper;
 
     public Flux<BookingDTO> findAll(int page, int size) {
         Pageable pageable = PageRequest.of(page, size);
@@ -61,7 +65,7 @@ public class BookingService {
         }
 
         Mono<PlaygroundDTO> pgMono = Mono
-                .fromCallable(() -> playgroundClient.findById(dto.getPlaygroundId()))
+                .fromCallable(() -> playgroundClientWrapper.getPlaygroundDTO(dto.getPlaygroundId()))
                 .subscribeOn(Schedulers.boundedElastic())
                 .handle((playground, sink) -> {
                     LocalTime pgStartTime = playground.getPlaygroundAvailability().getAvailableFrom();
@@ -94,7 +98,7 @@ public class BookingService {
             throw new NoBookingTargetException();
         } else if (dto.getPlayerId() == null) {
             sizeMono = Mono
-                    .fromCallable(() -> actorsClient.findTeamById(dto.getTeamId()))
+                    .fromCallable(() -> actorsClientForTeamWrapper.getTeamDTO(dto.getTeamId()))
                     .subscribeOn(Schedulers.boundedElastic())
                     .map(team -> team.getTeamSize().intValue());
         } else {
@@ -117,7 +121,7 @@ public class BookingService {
                                 if (it.getPlayerId() != null) {
                                     curCount[0] += 1;
                                 } else if (it.getTeamId() != null) {
-                                    TeamDTO team = actorsClient.findTeamById(it.getTeamId());
+                                    TeamDTO team = actorsClientForTeamWrapper.getTeamDTO(dto.getTeamId());
                                     curCount[0] += team.getTeamSize();
                                 }
                                 if (curCount[0] > capacity) {
