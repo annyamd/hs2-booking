@@ -1,0 +1,50 @@
+<?xml version="1.1" encoding="UTF-8" standalone="no"?>
+<databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+                   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                   xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                   https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet author="kimdaniiell@gmail.com" id="2024-02-27-insert-booking-data-1">
+        <insert tableName="booking">
+            <column name="date" value="01.03.2024"/>
+            <column name="start_time" value="07:00"/>
+            <column name="end_time" value="08:30"/>
+            <column name="player_id" value="2"/>
+            <column name="playground_id" value="5"/>
+        </insert>
+    </changeSet>
+
+    <changeSet author="kimdaniiell@gmail.com" id="2024-02-27-insert-booking-data-2">
+        <insert tableName="booking">
+            <column name="date" value="02.03.2024"/>
+            <column name="start_time" value="07:00"/>
+            <column name="end_time" value="08:30"/>
+            <column name="player_id" value="2"/>
+            <column name="playground_id" value="5"/>
+        </insert>
+    </changeSet>
+
+    <changeSet author="kimdaniiell@gmail.com" id="2024-02-27-insert-booking-data-3">
+        <insert tableName="booking">
+            <column name="date" value="03.03.2024"/>
+            <column name="start_time" value="07:00"/>
+            <column name="end_time" value="08:30"/>
+            <column name="player_id" value="2"/>
+            <column name="playground_id" value="5"/>
+        </insert>
+    </changeSet>
+
+    <changeSet author="kimdaniiell@gmail.com" id="2024-02-27-insert-booking-data-4">
+        <insert tableName="booking">
+            <column name="date" value="03.03.2024"/>
+            <column name="start_time" value="08:30"/>
+            <column name="end_time" value="10:00"/>
+            <column name="player_id" value="4"/>
+            <column name="playground_id" value="5"/>
+        </insert>
+    </changeSet>
+
+
+</databaseChangeLog>
+
+
