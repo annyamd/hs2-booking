@@ -4,7 +4,29 @@ spring:
   profiles:
     active: dev
   config:
-    import: configserver:http://localhost:8888/
+      import: configserver:http://localhost:8888/
 
 server:
   port: 8083
+
+resilience4j:
+  circuitbreaker:
+    configs:
+      default:
+        register-health-indicator: true
+        event-consumer-buffer-size: 10
+        failure-rate-threshold: 50
+        minimum-number-of-calls: 3
+#        automatic-transition-from-open-to-half-open-enabled: true
+        wait-duration-in-open-state: 5s
+        permitted-number-of-calls-in-half-open-state: 3
+        sliding-window-size: 10
+        sliding-window-type: count_based
+        allowHealthIndicatorToFail: false
+    instances:
+      playersCircuitBreaker:
+        base-config: default
+      teamCircuitBreaker:
+        base-config: default
+      playgroundCircuitBreaker:
+        base-config: default
