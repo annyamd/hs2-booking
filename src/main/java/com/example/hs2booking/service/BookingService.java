@@ -2,7 +2,8 @@ package com.example.hs2booking.service;
 
 import com.example.hs2booking.controller.exceptions.invalid.InvalidBookingTimeException;
 import com.example.hs2booking.controller.exceptions.invalid.NoBookingTargetException;
-import com.example.hs2booking.controller.exceptions.not_found.*;
+import com.example.hs2booking.controller.exceptions.not_found.BookingNotFoundException;
+import com.example.hs2booking.controller.exceptions.not_found.NotFoundException;
 import com.example.hs2booking.controller.exceptions.unavailable_action.PlaygroundNotAvailableException;
 import com.example.hs2booking.model.dto.BookingDTO;
 import com.example.hs2booking.model.dto.PlayerDTO;
@@ -10,8 +11,9 @@ import com.example.hs2booking.model.dto.PlaygroundDTO;
 import com.example.hs2booking.model.dto.TeamDTO;
 import com.example.hs2booking.model.entity.Booking;
 import com.example.hs2booking.repository.BookingRepository;
-import com.example.hs2booking.service.feign.ActorsClient;
-import com.example.hs2booking.service.feign.PlaygroundClient;
+import com.example.hs2booking.service.feign.ActorsClientForPlayerWrapper;
+import com.example.hs2booking.service.feign.ActorsClientForTeamWrapper;
+import com.example.hs2booking.service.feign.PlaygroundClientWrapper;
 import com.example.hs2booking.util.GeneralService;
 import com.example.hs2booking.util.Mapper;
 import lombok.RequiredArgsConstructor;
@@ -31,14 +33,19 @@ public class BookingService extends GeneralService<Booking, BookingDTO> {
 
     private final Mapper<Booking, BookingDTO> mapper = new BookingMapper();
     private final BookingRepository bookingRepository;
-    private final PlaygroundClient playgroundClient;
-    private final ActorsClient actorsClient;
+
+//    private final PlaygroundClient playgroundClient;
+//    private final ActorsClient actorsClient;
+    private final PlaygroundClientWrapper playgroundClientWrapper;
+    private final ActorsClientForTeamWrapper actorsClientForTeamWrapper;
+    private final ActorsClientForPlayerWrapper actorsClientForPlayerWrapper;
 
 
     @Transactional
     @Override
     public BookingDTO create(BookingDTO dto) {
-        PlaygroundDTO playground = playgroundClient.findById(dto.getPlaygroundId());
+
+        PlaygroundDTO playground = playgroundClientWrapper.getPlaygroundDTO(dto.getPlaygroundId());
         if (!playground.getPlaygroundAvailability().getIsAvailable()) {
             throw new PlaygroundNotAvailableException(playground.getPlaygroundId());
         }
@@ -49,9 +56,9 @@ public class BookingService extends GeneralService<Booking, BookingDTO> {
         boolean isPlayerChosen = false;
         if (dto.getPlayerId() != null) {
             isPlayerChosen = true;
-            player = actorsClient.findPlayerById(dto.getPlayerId());
+            player = actorsClientForPlayerWrapper.getPlayerDTO(dto.getPlayerId());
         } else if (dto.getTeamId() != null) {
-            team = actorsClient.findTeamById(dto.getTeamId());
+            team = actorsClientForTeamWrapper.getTeamDTO(dto.getTeamId());
             size = team.getTeamSize().intValue();
         } else {
             throw new NoBookingTargetException();
@@ -128,7 +135,8 @@ public class BookingService extends GeneralService<Booking, BookingDTO> {
                             if (it.getPlayerId() != null) {
                                 curCount[0] += 1;
                             } else if (it.getTeamId() != null) {
-                                TeamDTO team = actorsClient.findTeamById(it.getTeamId());
+//                                TeamDTO team = actorsClient.findTeamById(it.getTeamId());
+                                TeamDTO team = actorsClientForTeamWrapper.getTeamDTO(it.getTeamId());
                                 curCount[0] += team.getTeamSize();
                             }
                             if (curCount[0] > capacity) {

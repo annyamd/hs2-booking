@@ -1,6 +1,7 @@
 package com.example.hs2booking.controller.exceptions.handlers;
 
 import com.example.hs2booking.controller.exceptions.ControllerException;
+import com.example.hs2booking.controller.exceptions.fallback.ServiceUnavailableException;
 import com.example.hs2booking.controller.exceptions.invalid.InvalidRequestDataException;
 import com.example.hs2booking.controller.exceptions.not_found.NotFoundException;
 import com.example.hs2booking.controller.exceptions.unavailable_action.UnavailableActionException;
@@ -70,4 +71,10 @@ public class RestExceptionHandler {
         );
     }
 
+    @ExceptionHandler(ServiceUnavailableException.class)
+    @ResponseBody
+    @ResponseStatus(HttpStatus.FORBIDDEN)
+    protected ErrorDTO handleServiceUnavailability(ControllerException ex) {
+        return new ErrorDTO(ex.getTimestamp(), ex.getMessage(), ex.getError());
+    }
 }
