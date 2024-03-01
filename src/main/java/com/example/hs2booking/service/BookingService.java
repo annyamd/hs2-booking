@@ -9,8 +9,6 @@ import com.example.hs2booking.model.dto.PlaygroundDTO;
 import com.example.hs2booking.model.dto.TeamDTO;
 import com.example.hs2booking.model.entity.Booking;
 import com.example.hs2booking.repository.BookingRepository;
-import com.example.hs2booking.service.feign.ActorsClient;
-import com.example.hs2booking.service.feign.PlaygroundClient;
 import com.example.hs2booking.service.feign.ActorsClientForPlayerWrapper;
 import com.example.hs2booking.service.feign.ActorsClientForTeamWrapper;
 import com.example.hs2booking.service.feign.PlaygroundClientWrapper;
@@ -19,7 +17,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
@@ -64,13 +61,79 @@ public class BookingService {
             throw new InvalidBookingTimeException("start time must be earlier than end time");
         }
 
-        Mono<PlaygroundDTO> pgMono = Mono
-                .fromCallable(() -> playgroundClientWrapper.getPlaygroundDTO(dto.getPlaygroundId()))
-                .subscribeOn(Schedulers.boundedElastic())
-                .handle((playground, sink) -> {
-                    LocalTime pgStartTime = playground.getPlaygroundAvailability().getAvailableFrom();
-                    LocalTime pgEndTime = playground.getPlaygroundAvailability().getAvailableTo();
+        Mono<PlaygroundDTO> pgMono = Mono.just(dto.getPlaygroundId())
+                .flatMap(this::getPlaygroundUnblocking)
+                .flatMap(playground -> checkBookingTime(
+                        playground,
+                        dto.getDate(),
+                        playground.getPlaygroundAvailability().getAvailableFrom(),
+                        playground.getPlaygroundAvailability().getAvailableTo(),
+                        dto.getStartTime(),
+                        dto.getEndTime()
+                ));
 
+        Mono<Integer> sizeMono;
+
+        if (dto.getPlayerId() == null && dto.getTeamId() == null) {
+            throw new NoBookingTargetException();
+        } else if (dto.getPlayerId() == null) {
+            sizeMono = Mono.just(dto.getTeamId())
+                    .flatMap(this::getTeamUnblocking)
+                    .map(team -> team.getTeamSize().intValue());
+        } else {
+            sizeMono = Mono.just(1);
+        }
+
+        return Mono.zip(pgMono, sizeMono)
+                .flatMap((tuple) -> {
+                    int size = tuple.getT2();
+                    int capacity = tuple.getT1().getPlaygroundAvailability().getCapacity();
+                    final int[] curCount = new int[1];
+                    curCount[0] = size;
+
+                    return bookingRepository.findByPlaygroundId(dto.getPlaygroundId())
+                            .filter(it -> date.isEqual(it.getDate()))
+                            .filter(it -> it.getStartTime().isAfter(bookStartTime) && it.getStartTime().isBefore(bookEndTime)
+                                    || it.getEndTime().isBefore(bookEndTime) && it.getEndTime().isAfter(bookStartTime))
+                            .flatMap(it -> {
+                                if (it.getPlayerId() != null) {
+                                    return Mono.just(1);
+                                } else if (it.getTeamId() != null) {
+                                    return getTeamUnblocking(it.getTeamId())
+                                            .map(team -> team.getTeamSize().intValue());
+                                }
+                                return Mono.error(new InvalidBookingTimeException("no space in chosen playground"));
+                            })
+                            .flatMap(it -> {
+                                curCount[0] += it;
+                                if (curCount[0] > capacity) {
+                                    return Mono.error(new InvalidBookingTimeException("no space in chosen playground"));
+                                }
+                                return Mono.just(it);
+                            })
+                            .then();
+                })
+                .then(Mono.just(mapper.dtoToEntity(dto)))
+                .flatMap(bookingRepository::save)
+                .map(mapper::entityToDto);
+    }
+
+    private Mono<PlaygroundDTO> getPlaygroundUnblocking(long id) {
+        return Mono
+                .fromCallable(() -> playgroundClientWrapper.getPlaygroundDTO(id))
+                .subscribeOn(Schedulers.boundedElastic());
+    }
+
+    private Mono<TeamDTO> getTeamUnblocking(long id) {
+        return Mono
+                .fromCallable(() -> actorsClientForTeamWrapper.getTeamDTO(id))
+                .subscribeOn(Schedulers.boundedElastic());
+    }
+
+    private Mono<PlaygroundDTO> checkBookingTime(PlaygroundDTO pg, LocalDate date, LocalTime pgStartTime, LocalTime pgEndTime,
+                                                 LocalTime bookStartTime, LocalTime bookEndTime) {
+        return Mono.just(pg)
+                .handle((playground, sink) -> {
                     if (!playground.getPlaygroundAvailability().getIsAvailable()) {
                         sink.error(new PlaygroundNotAvailableException(playground.getPlaygroundId()));
                     } else if (bookEndTime.isAfter(pgEndTime)) {
@@ -90,51 +153,8 @@ public class BookingService {
                     }
 
                 });
-
-
-        Mono<Integer> sizeMono;
-
-        if (dto.getPlayerId() == null && dto.getTeamId() == null) {
-            throw new NoBookingTargetException();
-        } else if (dto.getPlayerId() == null) {
-            sizeMono = Mono
-                    .fromCallable(() -> actorsClientForTeamWrapper.getTeamDTO(dto.getTeamId()))
-                    .subscribeOn(Schedulers.boundedElastic())
-                    .map(team -> team.getTeamSize().intValue());
-        } else {
-            sizeMono = Mono.just(1);
-        }
-
-        return Mono.zip(pgMono, sizeMono)
-                .map((tuple) -> {
-                    PlaygroundDTO playground = tuple.getT1();
-                    int size = tuple.getT2();
-                    int capacity = playground.getPlaygroundAvailability().getCapacity();
-                    final int[] curCount = new int[1];
-                    curCount[0] = size;
-
-                    return bookingRepository.findByPlaygroundId(dto.getPlaygroundId())
-                            .filter(it -> date.isEqual(it.getDate()))
-                            .filter(it -> it.getStartTime().isAfter(bookStartTime) && it.getStartTime().isBefore(bookEndTime)
-                                    || it.getEndTime().isBefore(bookEndTime) && it.getEndTime().isAfter(bookStartTime))
-                            .handle((it, sink) -> {
-                                if (it.getPlayerId() != null) {
-                                    curCount[0] += 1;
-                                } else if (it.getTeamId() != null) {
-                                    TeamDTO team = actorsClientForTeamWrapper.getTeamDTO(dto.getTeamId());
-                                    curCount[0] += team.getTeamSize();
-                                }
-                                if (curCount[0] > capacity) {
-                                    sink.error(new InvalidBookingTimeException("no space in chosen playground"));
-                                }
-                                sink.next(1);
-                            })
-                            .next();
-                })
-                .map(it -> mapper.dtoToEntity(dto))
-                .flatMap(bookingRepository::save)
-                .map(mapper::entityToDto);
     }
+
 
     public Flux<BookingDTO> getBookingsByPlayer(long playerId) {
         return bookingRepository.findByPlayerId(playerId)
